@@ -23,7 +23,7 @@
 ```
 # SETTING
 ENV=dev
-SECRET_KEY=
+SECRET_KEY=BoilerPlate2025
 
 # POSTGRES
 ENGINE=postgresql+psycopg2
@@ -45,7 +45,7 @@ GOOGLE_JWKS_URL=https://www.googleapis.com/oauth2/v3/certs
 # AUTH GITHUB
 GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
-GITHUB_REDIRECT_URI=http://localhost:8000/api/v1/auth/github/callbackw
+GITHUB_REDIRECT_URI=http://localhost:8000/api/v1/auth/github/callback
 GITHUB_AUTH_URL=https://github.com/login/oauth/authorize
 GITHUB_TOKEN_URL=https://github.com/login/oauth/access_token
 GITHUB_USER_INFO_URL=https://api.github.com/user
