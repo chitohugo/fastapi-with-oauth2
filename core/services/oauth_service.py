@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 
 from fastapi import HTTPException
-from jwt import PyJWTError, algorithms, decode
+from jwt import PyJWTError, algorithms, decode, get_unverified_header
 
 from core.services.base_oauth_service import BaseOAuthService
 
@@ -53,7 +53,7 @@ class GoogleOAuthService(OAuthService, BaseOAuthService):
     async def _verify_id_token(self, id_token: str, access_token: str) -> Dict[str, Any]:
         jwks = (await self.http_client.get(self.jwks_url)).json()
         public_keys = {key["kid"]: algorithms.RSAAlgorithm.from_jwk(key) for key in jwks["keys"]}
-        headers = jwt.get_unverified_header(id_token)
+        headers = get_unverified_header(id_token)
         key = public_keys.get(headers["kid"])
 
         if not key:
