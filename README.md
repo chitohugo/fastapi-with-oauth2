@@ -1,21 +1,4 @@
-## _BoilerPlate FastApi with Clear Architecture_
-
-#### _In the structure of the project there are three main layers following the Hexagonal Architecture or Clean Architecture approach:_
-##### _User interface (UI) layer or external environment adapters:_
-    Location: app
-    Responsibility: Contains the UI, such as FastAPI routers, HTTP request and response handling in main.py, and other 
-    UI-related elements.
-
-##### _Business logic layer or use cases:_
-    Location: core
-    Responsibility: Contains business logic, including entities, services, and other components that implement 
-    the application's business rules.
-
-##### _Infrastructure or internal environment layer adapters:_
-    Location: db
-    Responsibility: Contains the implementation of the infrastructure, such as the mock database. 
-    This layer provides concrete implementations for data persistence, but the business logic does not directly 
-    depend on the implementation details.
+## _BoilerPlate FastApi with Oauth2 with Gogoogle and Github
 
 ### Running with docker
 
@@ -40,7 +23,7 @@
 ```
 # SETTING
 ENV=dev
-SECRET_KEY=BoilerPlate2024
+SECRET_KEY=BoilerPlate2025
 
 # POSTGRES
 ENGINE=postgresql+psycopg2
