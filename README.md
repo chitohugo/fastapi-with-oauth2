@@ -1,4 +1,4 @@
-## _BoilerPlate FastApi with Oauth2 with Google and Github
+## _BoilerPlate FastApi with Oauth2 (Google and Github) and JWT
 
 ### Running with docker
 
@@ -53,4 +53,7 @@ GITHUB_USER_INFO_URL=https://api.github.com/user
 # JWT
 ALGORITHM="HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# FRONTEND
+FRONTEND_URL=http://localhost:5173
 ```
