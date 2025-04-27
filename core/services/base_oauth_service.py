@@ -38,17 +38,45 @@ class BaseOAuthService:
         response.raise_for_status()
         return response.json()
 
-    async def _get_or_create_user_and_generate_token(self, email: str, username: str, first_name: Optional[str],
-                                                     last_name: Optional[str]) -> Dict[str, str]:
+    async def handle_oauth_user_login(
+            self,
+            email: str,
+            username: str,
+            first_name: Optional[str],
+            last_name: Optional[str]
+    ) -> Dict[str, str]:
+        user = self._get_or_create_user(email, username, first_name, last_name)
+        return self._generate_token_for_user(user)
+
+    def _get_or_create_user(
+            self,
+            email: str,
+            username: str,
+            first_name: Optional[str],
+            last_name: Optional[str]
+    ) -> User:
         if not email:
             raise HTTPException(status_code=400, detail="Email no disponible o no verificado.")
 
         user = self.repository.find_one("email", email)
-        if not user:
-            user = User(email=email, username=username, first_name=first_name, last_name=last_name)
-            user = self.repository.create(user)
+        if user:
+            return user
 
-        payload = Payload(id=user.id, email=user.email, first_name=user.first_name).model_dump()
+        new_user = User(
+            email=email,
+            username=username,
+            first_name=first_name,
+            last_name=last_name
+        )
+        return self.repository.create(new_user)
+
+    def _generate_token_for_user(self, user: User) -> Dict[str, str]:
+        payload = Payload(
+            id=user.id,
+            email=user.email,
+            first_name=user.first_name
+        ).model_dump()
+
         token_lifespan = timedelta(minutes=self.access_token_expire)
         access_token, _ = create_access_token(payload, token_lifespan)
         return {"access_token": access_token}

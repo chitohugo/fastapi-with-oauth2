@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta
 
+from jwt import encode, decode
+
 from core.exceptions import AuthError
 from fastapi import Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from config import settings
-from jose import jwt
 from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -13,11 +14,11 @@ ALGORITHM = "HS256"
 
 def create_access_token(subject: dict, expires_delta: timedelta = None) -> (str, str):
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire)
+        expire = datetime.now() + timedelta(minutes=settings.access_token_expire)
     payload = {"exp": expire, **subject}
-    encoded_jwt = jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
+    encoded_jwt = encode(payload, settings.secret_key, algorithm=ALGORITHM)
     expiration_datetime = expire.strftime(settings.datetime_format)
     return encoded_jwt, expiration_datetime
 
@@ -32,7 +33,7 @@ def get_password_hash(password: str) -> str:
 
 def decode_jwt(token: str) -> dict:
     try:
-        decoded_token = jwt.decode(token, settings.secret_key, algorithms=ALGORITHM)
+        decoded_token = decode(token, settings.secret_key, algorithms=ALGORITHM)
         return decoded_token if decoded_token["exp"] >= int(round(datetime.utcnow().timestamp())) else None
     except Exception:
         return {}
@@ -48,7 +49,7 @@ class JWTBearer(HTTPBearer):
             if not credentials.scheme == "Bearer":
                 raise AuthError(message="Invalid authentication scheme.")
             if not self.verify_jwt(credentials.credentials):
-                raise AuthError(detail="Invalid token or expired token.")
+                raise AuthError(message="Invalid token or expired token.")
             return credentials.credentials
         else:
             raise AuthError(message="Invalid authorization code.")
@@ -65,6 +66,6 @@ class JWTBearer(HTTPBearer):
 
     def create_jwt_token(data: dict):
         to_encode = data.copy()
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         to_encode.update({"exp": expire})
-        return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+        return encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)

@@ -50,6 +50,9 @@ class BaseConfig(BaseSettings):
     github_token_url: str = os.getenv("GITHUB_TOKEN_URL")
     github_user_info_url: str = os.getenv("GITHUB_USER_INFO_URL")
 
+    # FRONTEND
+    frontend_url: str = os.getenv("FRONTEND_URL")
+
     model_config = SettingsConfigDict(env_prefix='my_prefix_')
 
 

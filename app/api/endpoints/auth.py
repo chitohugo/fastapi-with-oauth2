@@ -10,16 +10,17 @@ from core.services.oauth_service import GoogleOAuthService, GitHubOAuthService
 
 router = APIRouter(
     prefix="/auth",
-    tags=["auth"], )
+    tags=["auth"],
+)
 
 
-@router.post("/sign-in", response_model=SignInResponse)
+@router.post("/signin", response_model=SignInResponse)
 @inject
 async def sign_in(payload: SignIn, service: AuthService = Depends(Provide[Container.auth_service])):
     return service.sign_in(payload)
 
 
-@router.post("/sign-up", response_model=User)
+@router.post("/signup", response_model=User)
 @inject
 async def sign_up(payload: SignUp, service: AuthService = Depends(Provide[Container.auth_service])):
     return service.sign_up(payload)

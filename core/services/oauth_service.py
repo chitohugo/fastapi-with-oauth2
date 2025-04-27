@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Coroutine
 
 from fastapi import HTTPException
 from jwt import PyJWTError, algorithms, decode, get_unverified_header
+from starlette.responses import RedirectResponse
 
+from config import settings
 from core.services.base_oauth_service import BaseOAuthService
 
 
@@ -32,23 +34,26 @@ class GoogleOAuthService(OAuthService, BaseOAuthService):
             f"scope=openid profile email"
         )
 
-    async def process_callback(self, code: str) -> Dict[str, Any]:
+    async def process_callback(self, code: str) -> RedirectResponse:
         if not code:
             raise HTTPException(status_code=400, detail="Código de autorización no recibido.")
-        tokens = await self._exchange_code_for_tokens(code)
-        id_token = tokens.get("id_token")
-        access_token = tokens.get("access_token")
+
+        response = await self._exchange_code_for_tokens(code)
+        id_token = response.get("id_token")
+        access_token = response.get("access_token")
 
         if not id_token:
             raise HTTPException(status_code=401, detail="ID Token no recibido.")
 
         payload = await self._verify_id_token(id_token, access_token)
-        return await self._get_or_create_user_and_generate_token(
+        response = await self.handle_oauth_user_login(
             payload["email"],
             username=payload["email"].split("@")[0],
             first_name=payload.get("given_name"),
             last_name=payload.get("family_name")
         )
+
+        return RedirectResponse(url=f"{settings.frontend_url}/oauth/callback?access_token={response['access_token']}")
 
     async def _verify_id_token(self, id_token: str, access_token: str) -> Dict[str, Any]:
         jwks = (await self.http_client.get(self.jwks_url)).json()
@@ -80,9 +85,10 @@ class GitHubOAuthService(OAuthService, BaseOAuthService):
     async def get_login_url(self) -> str:
         return f"{self.auth_url}?client_id={self.client_id}&redirect_uri={self.redirect_uri}&scope=user:email"
 
-    async def process_callback(self, code: str) -> Dict[str, Any]:
+    async def process_callback(self, code: str) -> RedirectResponse:
         if not code:
             raise HTTPException(status_code=400, detail="Código de autorización no recibido.")
+
         tokens = await self._exchange_code_for_tokens(code, headers={"Accept": "application/json"})
         access_token = tokens.get("access_token")
 
@@ -92,12 +98,14 @@ class GitHubOAuthService(OAuthService, BaseOAuthService):
         user_info = await self._get_user_info(access_token)
         email = user_info.get("email") or await self._get_primary_email(access_token)
 
-        return await self._get_or_create_user_and_generate_token(
+        response = await self.handle_oauth_user_login(
             email,
             username=user_info.get("login"),
             first_name=(user_info.get("name") or "").split(" ")[0],
             last_name=" ".join((user_info.get("name") or "").split(" ")[1:])
         )
+
+        return RedirectResponse(url=f"{settings.frontend_url}/oauth/callback?access_token={response['access_token']}")
 
     async def _get_user_info(self, token: str) -> Dict[str, Any]:
         headers = {
