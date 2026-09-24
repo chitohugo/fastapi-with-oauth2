@@ -1,24 +1,38 @@
-FROM python:3.11.7
+# syntax=docker/dockerfile:1
 
-ENV TZ=America/Argentina/Buenos_Aires
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+FROM python:3.12-slim-bookworm AS base
 
-# Set work directory
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    TZ=America/Argentina/Buenos_Aires
+
 WORKDIR /app
 
-# Set env variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libpq5 \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo "$TZ" > /etc/timezone \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies
-RUN pip install --upgrade pip
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip \
+    && pip install -r requirements.txt
 
-# Copy project
-COPY . /app
-
+COPY . .
 RUN chmod +x /app/entrypoint.sh
-ENTRYPOINT /app/entrypoint.sh
 
+EXPOSE 8000
 
+# Development: bind-mount friendly (default compose target)
+FROM base AS dev
+ENTRYPOINT ["/app/entrypoint.sh"]
+
+# Production: non-root user, no reload (compose profile prod)
+FROM base AS prod
+RUN useradd --create-home --uid 1000 appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+ENV UVICORN_RELOAD=false
+ENTRYPOINT ["/app/entrypoint.sh"]

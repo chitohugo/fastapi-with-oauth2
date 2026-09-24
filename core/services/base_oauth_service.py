@@ -1,19 +1,26 @@
-from typing import Dict, Any, Optional
+from datetime import timedelta
+from typing import Any, Dict, Optional
+
 from httpx import AsyncClient
 from fastapi import HTTPException
-from datetime import timedelta
 
 from core.repository.user_repository import UserRepository
 from core.schema.auth_schema import Payload
-from core.schema.user_schema import User
+from core.schema.user_schema import User as UserSchema
 from core.security import create_access_token
 
 
-
 class BaseOAuthService:
-    def __init__(self, client_id: str, client_secret: str, redirect_uri: str,
-                 token_url: str, access_token_expire: int,
-                 user_repository: UserRepository, http_client: AsyncClient):
+    def __init__(
+        self,
+        client_id: str,
+        client_secret: str,
+        redirect_uri: str,
+        token_url: str,
+        access_token_expire: int,
+        user_repository: UserRepository,
+        http_client: AsyncClient,
+    ):
         self.client_id = client_id
         self.client_secret = client_secret
         self.redirect_uri = redirect_uri
@@ -22,8 +29,12 @@ class BaseOAuthService:
         self.repository = user_repository
         self.http_client = http_client
 
-    async def _exchange_code_for_tokens(self, code: str, headers: dict = None, extra_data: dict = None) -> Dict[
-        str, Any]:
+    async def _exchange_code_for_tokens(
+        self,
+        code: str,
+        headers: dict = None,
+        extra_data: dict = None,
+    ) -> Dict[str, Any]:
         data = {
             "code": code,
             "client_id": self.client_id,
@@ -39,42 +50,42 @@ class BaseOAuthService:
         return response.json()
 
     async def handle_oauth_user_login(
-            self,
-            email: str,
-            username: str,
-            first_name: Optional[str],
-            last_name: Optional[str]
+        self,
+        email: str,
+        username: str,
+        first_name: Optional[str],
+        last_name: Optional[str],
     ) -> Dict[str, str]:
-        user = self._get_or_create_user(email, username, first_name, last_name)
+        user = await self._get_or_create_user(email, username, first_name, last_name)
         return self._generate_token_for_user(user)
 
-    def _get_or_create_user(
-            self,
-            email: str,
-            username: str,
-            first_name: Optional[str],
-            last_name: Optional[str]
-    ) -> User:
+    async def _get_or_create_user(
+        self,
+        email: str,
+        username: str,
+        first_name: Optional[str],
+        last_name: Optional[str],
+    ):
         if not email:
             raise HTTPException(status_code=400, detail="Email no disponible o no verificado.")
 
-        user = self.repository.find_one("email", email)
+        user = await self.repository.find_one("email", email)
         if user:
             return user
 
-        new_user = User(
+        new_user = UserSchema(
             email=email,
             username=username,
-            first_name=first_name,
-            last_name=last_name
+            first_name=first_name or "",
+            last_name=last_name or "",
         )
-        return self.repository.create(new_user)
+        return await self.repository.create(new_user)
 
-    def _generate_token_for_user(self, user: User) -> Dict[str, str]:
+    def _generate_token_for_user(self, user) -> Dict[str, str]:
         payload = Payload(
             id=user.id,
             email=user.email,
-            first_name=user.first_name
+            first_name=user.first_name,
         ).model_dump()
 
         token_lifespan = timedelta(minutes=self.access_token_expire)

@@ -1,54 +1,69 @@
-from contextlib import AbstractContextManager
-from typing import Callable
+from typing import Any, Callable, Type
 
 from core.exceptions import DuplicatedError, NotFoundError
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class BaseRepository:
-    def __init__(self, session_factory: Callable[..., AbstractContextManager[Session]], model) -> None:
+    def __init__(
+        self,
+        session_factory: Callable[..., Any],
+        model: Type,
+    ) -> None:
         self.session_factory = session_factory
         self.model = model
 
-    def read_by_field(self, field_name, value):
-        with self.session_factory() as session:
-            query = session.query(self.model)
-            query = query.filter(getattr(self.model, field_name) == value).first()
-            if not query:
+    async def read_by_field(self, field_name: str, value: Any):
+        async with self.session_factory() as session:
+            stmt = select(self.model).where(getattr(self.model, field_name) == value)
+            result = await session.execute(stmt)
+            entity = result.scalar_one_or_none()
+            if not entity:
                 raise NotFoundError(message=f"Not found {field_name} : {value}")
-            return query
+            return entity
 
-    def read(self):
-        with self.session_factory() as session:
-            query = session.query(self.model)
-            return query
+    async def read(self):
+        async with self.session_factory() as session:
+            stmt = select(self.model)
+            result = await session.scalars(stmt)
+            return result.all()
 
-    def create(self, schema):
-        with self.session_factory() as session:
+    async def create(self, schema):
+        async with self.session_factory() as session:
             try:
-                query = self.model(**schema.model_dump(), id=None)
-                session.add(query)
-                session.commit()
-                session.refresh(query)
-            except IntegrityError as e:
-                raise DuplicatedError(message="The value already exists") from e
-            return query
-    def update(self, id: int, schema):
-        with self.session_factory() as session:
-            session.query(self.model).filter(self.model.id == id).update(schema.model_dump(exclude_none=True))
-            session.commit()
-            return self.read_by_field("id", id)
+                entity = self.model(**schema.model_dump(), id=None)
+                session.add(entity)
+                await session.commit()
+                await session.refresh(entity)
+            except IntegrityError as exc:
+                await session.rollback()
+                raise DuplicatedError(message="The value already exists") from exc
+            return entity
 
-    def delete_by_id(self, id: int):
-        with self.session_factory() as session:
-            query = session.query(self.model).filter(self.model.id == id).first()
-            if not query:
+    async def update(self, id: int, schema):
+        values = schema.model_dump(exclude_unset=True, exclude_none=True)
+        if not values:
+            return await self.read_by_field("id", id)
+        async with self.session_factory() as session:
+            stmt = update(self.model).where(self.model.id == id).values(**values)
+            await session.execute(stmt)
+            await session.commit()
+        return await self.read_by_field("id", id)
+
+    async def delete_by_id(self, id: int):
+        async with self.session_factory() as session:
+            stmt = select(self.model).where(self.model.id == id)
+            result = await session.execute(stmt)
+            entity = result.scalar_one_or_none()
+            if not entity:
                 raise NotFoundError(message=f"not found id : {id}")
-            session.delete(query)
-            session.commit()
+            await session.delete(entity)
+            await session.commit()
 
-    def find_one(self, field_name, value):
-        with self.session_factory() as session:
-            query = session.query(self.model)
-            return query.filter(getattr(self.model, field_name) == value).first()
+    async def find_one(self, field_name: str, value: Any):
+        async with self.session_factory() as session:
+            stmt = select(self.model).where(getattr(self.model, field_name) == value)
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()

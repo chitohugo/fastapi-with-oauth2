@@ -50,7 +50,7 @@ class GoogleOAuthService(OAuthService, BaseOAuthService):
             payload["email"],
             username=payload["email"].split("@")[0],
             first_name=payload.get("given_name"),
-            last_name=payload.get("family_name")
+            last_name=payload.get("last_name"),
         )
 
         return RedirectResponse(url=f"{settings.frontend_url}/oauth/callback?access_token={response['access_token']}")
@@ -102,7 +102,7 @@ class GitHubOAuthService(OAuthService, BaseOAuthService):
             email,
             username=user_info.get("login"),
             first_name=(user_info.get("name") or "").split(" ")[0],
-            last_name=" ".join((user_info.get("name") or "").split(" ")[1:])
+            last_name=" ".join((user_info.get("name") or "").split(" ")[1:]),
         )
 
         return RedirectResponse(url=f"{settings.frontend_url}/oauth/callback?access_token={response['access_token']}")

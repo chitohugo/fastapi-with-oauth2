@@ -1,76 +1,92 @@
+import asyncio
 import os
 
 os.environ["ENV"] = "test"
 
-from core.models.user import User
-from db.database import BaseModel
-
 import pytest
+import pytest_asyncio
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
-from core.security import get_password_hash
 from config import settings
+from core.models.user import User
+from core.security import get_password_hash
+from db.database import BaseModel
 from main import AppCreator
 
 
-@pytest.fixture(scope="function")
-def session():
-    engine = create_engine(settings.database_url)
-    BaseModel.metadata.create_all(engine)
+async def _reset_app_database(app_creator: AppCreator) -> None:
+    async with app_creator.db._engine.begin() as conn:
+        await conn.run_sync(BaseModel.metadata.drop_all)
+    await app_creator.db.create_database()
 
-    session = Session(bind=engine)
 
-    try:
-        yield session
-    finally:
-        session.rollback()
-        session.close()
-        BaseModel.metadata.drop_all(engine)
+@pytest_asyncio.fixture(scope="function")
+async def session():
+    engine = create_async_engine(settings.database_url)
+    async with engine.begin() as conn:
+        await conn.run_sync(BaseModel.metadata.create_all)
+
+    async with AsyncSession(engine, expire_on_commit=False) as db_session:
+        try:
+            yield db_session
+        finally:
+            await db_session.rollback()
+
+    async with engine.begin() as conn:
+        await conn.run_sync(BaseModel.metadata.drop_all)
+    await engine.dispose()
+
 
 @pytest.fixture
-def client(session):
+def client():
+    AppCreator.reset_for_tests()
     app_creator = AppCreator()
     app = app_creator.app
+    asyncio.run(_reset_app_database(app_creator))
 
-    with TestClient(app) as client:
-        yield client
+    with TestClient(app) as test_client:
+        yield test_client
 
-@pytest.fixture
-def create_user(session):
+    asyncio.run(_reset_app_database(app_creator))
+
+
+@pytest_asyncio.fixture
+async def create_user(session):
     data = {
         "email": "julian.clark@gmail.com",
         "username": "delicatesilk",
         "first_name": "Julian",
         "last_name": "Clark",
-        "password": get_password_hash('dolor')
+        "password": get_password_hash("dolor"),
     }
     instance = User(**data)
     session.add(instance)
-    session.commit()
+    await session.commit()
+    await session.refresh(instance)
     yield instance
 
 
 @pytest.fixture
 def auth_token(client):
-    auth_data = {
+    signup = {
         "email": "julian.clark@gmail.com",
-        "password": "dolor"
+        "username": "delicatesilk",
+        "first_name": "Julian",
+        "last_name": "Clark",
+        "password": "dolor",
     }
-    response = client.post("/api/v1/auth/sign-in", json=auth_data)
+    client.post("/api/v1/auth/signup", json=signup)
+    response = client.post(
+        "/api/v1/auth/signin",
+        json={"email": signup["email"], "password": signup["password"]},
+    )
     assert response.status_code == 200
-    token = response.json().get("access_token")
-
-    return token
+    return response.json().get("access_token")
 
 
 @pytest.fixture
-def req(session, auth_token):
+def req(client, auth_token):
     headers = {"Authorization": f"Bearer {auth_token}"}
-    app_creator = AppCreator()
-    app = app_creator.app
-
-    with TestClient(app) as client:
-        client.headers.update(headers)
-        yield client
+    client.headers.update(headers)
+    return client

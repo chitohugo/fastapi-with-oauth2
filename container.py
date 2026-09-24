@@ -1,6 +1,6 @@
 from httpx import AsyncClient
 
-from config import settings
+from config import get_settings, settings
 from core.repository.user_repository import UserRepository
 from core.services.auth_service import AuthService
 from core.services.character_service import CharacterService
@@ -19,10 +19,10 @@ class Container(containers.DeclarativeContainer):
             "app.api.endpoints.auth",
             "app.api.endpoints.users",
             "app.api.endpoints.characters",
-            "core.dependencies"
+            "core.dependencies",
         ]
     )
-    db = providers.Singleton(Database, db_url=config.database_url)
+    db = providers.Singleton(Database, db_url=get_settings().database_url)
 
     user_repository = providers.Factory(UserRepository, session_factory=db.provided.session)
     character_repository = providers.Factory(CharacterRepository, session_factory=db.provided.session)

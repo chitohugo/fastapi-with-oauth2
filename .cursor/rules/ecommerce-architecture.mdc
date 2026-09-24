@@ -1,0 +1,99 @@
+Actúa como un Staff Backend Engineer experto en Python, FastAPI, SQLAlchemy, PostgreSQL y Model Context Protocol (MCP).
+
+## Contexto
+
+Este es un proyecto EXISTENTE. Es un CRUD de personajes desarrollado en FastAPI.
+
+Regla principal: NO quiero que reescribas ni refactorices la aplicación completa. MCP debe integrarse como una nueva capacidad reutilizando la lógica actual.
+
+## Fase 1 — Auditoría (no escribas código todavía)
+
+Inspecciona todo el proyecto y genera un informe con:
+
+- Árbol de carpetas.
+- Arquitectura detectada.
+- Modelos de dominio.
+- Esquema de base de datos.
+- Servicios y repositorios existentes.
+- Dependencias e inyección de dependencias.
+- Endpoints CRUD actuales.
+- Posibles puntos de integración para MCP.
+
+Si encuentras problemas arquitectónicos, menciónalos pero NO los soluciones todavía.
+
+Detente y espera mi aprobación.
+
+---
+
+## Fase 2 — Diseño de MCP
+
+Propón una arquitectura de integración.
+
+Objetivos:
+
+- Mantener separación de responsabilidades.
+- Reutilizar servicios existentes.
+- Evitar duplicación de lógica.
+- Mantener compatibilidad con los endpoints REST.
+
+Propón la estructura de archivos, por ejemplo:
+
+app/
+    api/
+    services/
+    repositories/
+    models/
+    mcp/
+        server.py
+        tools.py
+        schemas.py
+
+Explica por qué cada archivo existe.
+
+Detente nuevamente y espera aprobación.
+
+---
+
+## Fase 3 — Implementación
+
+Implementa el servidor MCP utilizando el SDK oficial de Model Context Protocol.
+
+Crea estas tools:
+
+- create_character
+- get_character
+- list_characters
+- update_character
+- delete_character
+
+Cada tool debe invocar los servicios existentes.
+Nunca acceder directamente al ORM desde las tools.
+
+Requisitos técnicos:
+
+- Python 3.12
+- Pydantic v2
+- Tipado completo
+- Docstrings Google
+- Manejo de errores consistente
+- Async si el proyecto ya utiliza async
+
+---
+
+## Fase 4 — Calidad
+
+Antes de finalizar:
+
+- Verifica que todos los imports funcionen.
+- Comprueba que el proyecto siga compilando.
+- No rompas los endpoints existentes.
+- Genera un README con instrucciones de ejecución del servidor MCP.
+- Incluye un ejemplo de un cliente MCP consumiendo las herramientas.
+
+## Restricciones
+
+- No elimines código existente.
+- No cambies nombres públicos de endpoints.
+- No hagas refactorizaciones masivas.
+- Cada modificación debe estar justificada.
+- Muestra siempre el diff de archivos modificados antes de aplicarlo.

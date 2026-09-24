@@ -1,56 +1,53 @@
-from typing import List
-
-from core.dependencies import get_current_user
+from container import Container
+from core.dependencies import get_current_user, require_self
+from core.models.user import User
+from core.schema.base_schema import Blank
+from core.schema.user_schema import UpdateUser, User as UserSchema
 from core.security import JWTBearer
 from core.services.user_service import UserService
-from dependency_injector.wiring import inject, Provide
+from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends
-from container import Container
-from core.schema.base_schema import Blank
-from core.schema.character_schema import UpdateCharacter
-from core.schema.user_schema import User
-
 
 router = APIRouter(
     prefix="/users",
     tags=["users"],
-    dependencies=[Depends(JWTBearer())]
+    dependencies=[Depends(JWTBearer())],
 )
 
 
-
-@router.get("", response_model=List[User], dependencies=[Depends(get_current_user)])
+@router.get("/me", response_model=UserSchema)
 @inject
-async def get_users(
-        service: UserService = Depends(Provide[Container.user_service])
-):
-    users = service.get_list()
-    return users
+async def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
 
 
-@router.get("/{id}", response_model=User, dependencies=[Depends(get_current_user)])
+@router.get("/{id}", response_model=UserSchema)
 @inject
 async def get_user(
-        id: int,
-        service: UserService = Depends(Provide[Container.user_service]),
+    id: int,
+    _owner: User = Depends(require_self),
+    service: UserService = Depends(Provide[Container.user_service]),
 ):
-    return service.get_by_id(id)
+    return await service.get_by_id(id)
 
 
-@router.patch("/{id}", response_model=User, dependencies=[Depends(get_current_user)])
+@router.patch("/{id}", response_model=UserSchema)
 @inject
 async def update_user(
-        id: int,
-        user: UpdateCharacter,
-        service: UserService = Depends(Provide[Container.user_service])
+    id: int,
+    user: UpdateUser,
+    _owner: User = Depends(require_self),
+    service: UserService = Depends(Provide[Container.user_service]),
 ):
-    return service.patch(id, user)
+    return await service.patch(id, user)
 
 
-@router.delete("/{id}", response_model=Blank, dependencies=[Depends(get_current_user)])
+@router.delete("/{id}", response_model=Blank)
 @inject
 async def delete_user(
-        id: int,
-        service: UserService = Depends(Provide[Container.user_service])
+    id: int,
+    _owner: User = Depends(require_self),
+    service: UserService = Depends(Provide[Container.user_service]),
 ):
-    return service.remove_by_id(id)
+    await service.remove_by_id(id)
+    return Blank()

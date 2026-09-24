@@ -1,29 +1,38 @@
-from core.exceptions import AuthError
-from core.security import ALGORITHM, JWTBearer
-from core.services.user_service import UserService
+from core.exceptions import AuthError, ForbiddenError
 from core.models.user import User
-from dependency_injector.wiring import inject, Provide
-from fastapi import Depends
-from config import settings
-from container import Container
 from core.schema.auth_schema import Payload
-from jose import jwt
+from core.security import JWTBearer, decode_access_token_payload
+from core.services.user_service import UserService
+from dependency_injector.wiring import Provide, inject
+from fastapi import Depends
 from pydantic import ValidationError
+
+from container import Container
 
 
 @inject
-def get_current_user(
-        token: str = Depends(JWTBearer()),
-        service: UserService = Depends(Provide[Container.user_service]),
+async def get_current_user(
+    token: str = Depends(JWTBearer()),
+    service: UserService = Depends(Provide[Container.user_service]),
 ) -> User:
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=ALGORITHM)
-        token_data = Payload(**payload)
-    except (jwt.JWTError, ValidationError):
-        raise AuthError(message="Could not validate credentials")
+        payload = decode_access_token_payload(token)
+        token_data = Payload(**{k: v for k, v in payload.items() if k != "exp"})
+    except ValidationError as exc:
+        raise AuthError(message="Could not validate credentials") from exc
 
-    current_user = service.get_by_field("id", token_data.id)
+    current_user = await service.get_by_field("id", token_data.id)
     if not current_user:
-        raise AuthError(message="Lead not found")
+        raise AuthError(message="User not found")
 
+    return current_user
+
+
+async def require_self(
+    id: int,
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Allow access only when the authenticated user matches the path ``id``."""
+    if current_user.id != id:
+        raise ForbiddenError(message="You can only access your own user profile")
     return current_user

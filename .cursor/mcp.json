@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "character-crud": {
+      "command": "/home/hugogonzalez/fastapi-with-oauth2/scripts/mcp_cursor_docker.sh",
+      "args": []
+    }
+  }
+}
