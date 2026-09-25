@@ -58,6 +58,25 @@ services:
       start_period: 40s
     restart: unless-stopped
 
+  ngrok:
+    profiles: ["ngrok"]
+    image: ngrok/ngrok:3
+    container_name: ngrok-character
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+      NGROK_URL: ${NGROK_URL:-}
+    entrypoint: ["sh", "/ngrok.sh"]
+    volumes:
+      - ./scripts/ngrok.sh:/ngrok.sh:ro
+    ports:
+      - "${NGROK_INSPECT_PORT:-4040}:4040"
+    networks:
+      - character
+    depends_on:
+      character:
+        condition: service_healthy
+    restart: unless-stopped
+
   mcp-http:
     profiles: ["mcp"]
     build:

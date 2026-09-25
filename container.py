@@ -2,10 +2,13 @@ from httpx import AsyncClient
 
 from config import get_settings, settings
 from core.repository.user_repository import UserRepository
+from core.repository.whatsapp_contact_repository import WhatsAppContactRepository
 from core.services.auth_service import AuthService
 from core.services.character_service import CharacterService
 from core.services.oauth_service import GoogleOAuthService, GitHubOAuthService
 from core.services.user_service import UserService
+from core.services.whatsapp_client import WhatsAppClient
+from core.services.whatsapp_service import WhatsAppService
 from core.repository.character_repository import CharacterRepository
 from dependency_injector import containers, providers
 from db.database import Database
@@ -19,6 +22,7 @@ class Container(containers.DeclarativeContainer):
             "app.api.endpoints.auth",
             "app.api.endpoints.users",
             "app.api.endpoints.characters",
+            "app.api.endpoints.whatsapp",
             "core.dependencies",
         ]
     )
@@ -57,4 +61,26 @@ class Container(containers.DeclarativeContainer):
         user_repository=user_repository,
         http_client=http_client,
         user_info_url=config.github_user_info_url
+    )
+
+    whatsapp_contact_repository = providers.Factory(
+        WhatsAppContactRepository,
+        session_factory=db.provided.session,
+    )
+
+    whatsapp_client = providers.Singleton(
+        WhatsAppClient,
+        access_token=settings.whatsapp_access_token,
+        phone_number_id=settings.whatsapp_phone_number_id,
+        api_version=settings.whatsapp_api_version,
+        graph_url=settings.whatsapp_graph_url,
+        http_client=http_client,
+    )
+
+    whatsapp_service = providers.Factory(
+        WhatsAppService,
+        character_service=character_service,
+        contact_repository=whatsapp_contact_repository,
+        client=whatsapp_client,
+        default_user_id=settings.whatsapp_default_user_id,
     )

@@ -1,6 +1,6 @@
 COMPOSE=docker compose
 
-.PHONY: up down build logs test migrate mcp mcp-http shell
+.PHONY: up down build logs test migrate mcp mcp-http ngrok shell
 
 up:
 	$(COMPOSE) up -d
@@ -25,6 +25,9 @@ mcp:
 
 mcp-http:
 	$(COMPOSE) --profile mcp up -d mcp-http
+
+ngrok:
+	$(COMPOSE) --profile ngrok up -d ngrok
 
 shell:
 	$(COMPOSE) exec character bash

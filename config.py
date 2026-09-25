@@ -1,6 +1,6 @@
 import os
 from functools import lru_cache
-from typing import List
+from typing import List, Optional
 
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -57,6 +57,35 @@ class Settings(BaseSettings):
 
     rate_limit_signin: str = Field(default="10/minute", validation_alias=AliasChoices("RATE_LIMIT_SIGNIN"))
 
+    whatsapp_verify_token: str = Field(
+        default="",
+        validation_alias=AliasChoices("WHATSAPP_VERIFY_TOKEN"),
+    )
+    whatsapp_app_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("WHATSAPP_APP_SECRET"),
+    )
+    whatsapp_access_token: str = Field(
+        default="",
+        validation_alias=AliasChoices("WHATSAPP_ACCESS_TOKEN"),
+    )
+    whatsapp_phone_number_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("WHATSAPP_PHONE_NUMBER_ID"),
+    )
+    whatsapp_api_version: str = Field(
+        default="v22.0",
+        validation_alias=AliasChoices("WHATSAPP_API_VERSION"),
+    )
+    whatsapp_graph_url: str = Field(
+        default="https://graph.facebook.com",
+        validation_alias=AliasChoices("WHATSAPP_GRAPH_URL"),
+    )
+    whatsapp_default_user_id: Optional[int] = Field(
+        default=None,
+        validation_alias=AliasChoices("WHATSAPP_DEFAULT_USER_ID"),
+    )
+
     @property
     def database_url(self) -> str:
         return f"{self.engine}://{self.user}:{self.password}@{self.host}:{self.port}/{self.database_name}"
@@ -67,6 +96,13 @@ class Settings(BaseSettings):
         if raw == "*" or not raw:
             return ["*"]
         return [part.strip() for part in raw.split(",") if part.strip()]
+
+    @field_validator("whatsapp_default_user_id", mode="before")
+    @classmethod
+    def blank_whatsapp_user_id(cls, value):
+        if value is None or value == "":
+            return None
+        return value
 
     @field_validator("secret_key")
     @classmethod
@@ -102,6 +138,11 @@ class TestSettings(Settings):
     github_token_url: str = "https://github.com/login/oauth/access_token"
     github_user_info_url: str = "https://api.github.com/user"
     frontend_url: str = "http://localhost:5173"
+    whatsapp_verify_token: str = "test-verify-token"
+    whatsapp_app_secret: str = "test-app-secret"
+    whatsapp_access_token: str = ""
+    whatsapp_phone_number_id: str = ""
+    whatsapp_default_user_id: Optional[int] = None
 
     @property
     def database_url(self) -> str:

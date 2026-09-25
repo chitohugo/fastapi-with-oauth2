@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from config import settings
 from core.models.user import User
+from core.rate_limit import limiter
 from core.security import get_password_hash
 from db.database import BaseModel
 from main import AppCreator
@@ -40,6 +41,7 @@ async def session():
 
 @pytest.fixture
 def client():
+    limiter.reset()
     AppCreator.reset_for_tests()
     app_creator = AppCreator()
     app = app_creator.app

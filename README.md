@@ -13,6 +13,7 @@ El entorno de ejecución recomendado es **Docker Compose** (API, Postgres, tests
 - **JWT** (signup/signin) y flujos **Google / GitHub OAuth**
 - CRUD de **characters** con ownership (`user_id`)
 - **MCP** (Model Context Protocol): tools `create_character`, `get_character`, `list_characters`, `update_character`, `delete_character`
+- **WhatsApp** (Cloud API): webhook para manejar personajes por chat
 - Inyección de dependencias con **dependency-injector**
 
 ---
@@ -31,6 +32,7 @@ app/mcp/               → Servidor MCP (stdio / HTTP opcional)
 flowchart LR
   ClientREST[REST Client] --> API[FastAPI]
   ClientMCP[MCP Client / Cursor] --> MCP[MCP Server]
+  WhatsApp[WhatsApp Cloud API] --> API
   API --> Svc[CharacterService]
   MCP --> Svc
   Svc --> Repo[Repositories async]
@@ -104,6 +106,7 @@ make test
 | `make migrate` | Alembic upgrade head |
 | `make mcp` | MCP stdio (script Docker) |
 | `make mcp-http` | Perfil MCP HTTP (puerto 8001) |
+| `make ngrok` | Túnel HTTPS hacia la API (perfil `ngrok`, inspector en el puerto 4040) |
 
 ---
 
@@ -119,6 +122,13 @@ make test
 | `MCP_DEFAULT_USER_ID` | Usuario dueño por defecto en tools MCP |
 | `BACKEND_CORS_ORIGINS` | Orígenes CORS (`*` o lista separada por comas) |
 | `RATE_LIMIT_SIGNIN` | Límite en signup/signin (ej. `10/minute`) |
+| `WHATSAPP_VERIFY_TOKEN` | Token de verificación del webhook de Meta |
+| `WHATSAPP_APP_SECRET` | App secret para validar `X-Hub-Signature-256` |
+| `WHATSAPP_ACCESS_TOKEN` | Token para enviar respuestas por la Cloud API |
+| `WHATSAPP_PHONE_NUMBER_ID` | ID del número de WhatsApp Business |
+| `WHATSAPP_DEFAULT_USER_ID` | Usuario único si el teléfono no está vinculado (opcional) |
+| `NGROK_AUTHTOKEN` | Token del agente ngrok (perfil `ngrok`) |
+| `NGROK_URL` | URL reservada del túnel, por ejemplo `https://my-app.ngrok.app` (opcional) |
 
 Plantilla completa: [`.env.example`](.env.example). Tras el primer `signup`, actualiza `MCP_DEFAULT_USER_ID` con el `id` de `GET /api/v1/users`.
 
@@ -126,6 +136,7 @@ Plantilla completa: [`.env.example`](.env.example). Tras el primer `signup`, act
 
 - `API_PUBLISH_PORT` (default `8000`)
 - `POSTGRES_PUBLISH_PORT` (default `5434`)
+- `NGROK_INSPECT_PORT` (default `4040`)
 
 ---
 
@@ -138,6 +149,7 @@ Prefijo: `/api/v1`
 | Auth | `POST /auth/signup`, `POST /auth/signin`, OAuth Google/GitHub |
 | Users | `GET /users/me`, `GET/PATCH/DELETE /users/{id}` (solo tu propio id) |
 | Characters | `GET/POST /characters`, `GET/PATCH/DELETE /characters/{id}` (JWT) |
+| WhatsApp | `GET/POST /webhooks/whatsapp` (Meta), `PUT/GET/DELETE /whatsapp/me` (JWT) |
 | Health | `GET /health`, `GET /ready` (DB ping) |
 
 Los personajes están **acotados al usuario autenticado**. PATCH admite **campos parciales** en users y characters.
@@ -168,6 +180,46 @@ docker compose --profile prod up --build character-prod db
 Variables útiles: `UVICORN_WORKERS`, `UVICORN_RELOAD=false` (ya fijado en el servicio prod).
 
 ---
+
+## WhatsApp
+
+El webhook de la [WhatsApp Cloud API](https://developers.facebook.com/docs/whatsapp/cloud-api/guides/set-up-webhooks) habla con el mismo `CharacterService` que la API REST.
+
+1. En local, el túnel publica la API. Poné `NGROK_AUTHTOKEN` en `.env` y levantá el perfil:
+
+```bash
+make ngrok
+docker compose logs ngrok
+```
+
+El inspector queda en [http://localhost:4040](http://localhost:4040). En Meta for Developers, suscribí el callback  
+`https://<subdominio>.ngrok-free.app/api/v1/webhooks/whatsapp`  
+con el mismo valor que `WHATSAPP_VERIFY_TOKEN`. `NGROK_URL` fija un dominio reservado para que esa URL no cambie al reiniciar.
+2. Completá `WHATSAPP_APP_SECRET`, `WHATSAPP_ACCESS_TOKEN` y `WHATSAPP_PHONE_NUMBER_ID`.
+3. Con un JWT, vinculá tu teléfono (el mismo formato que envía Meta, con código de país):
+
+```bash
+curl -X PUT http://localhost:8000/api/v1/whatsapp/me \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"phone":"5491112345678"}'
+```
+
+Si no vinculás números, `WHATSAPP_DEFAULT_USER_ID` hace que **cualquier** chat opere como ese usuario. Sirve para una sola persona; en cuanto hay más, vinculá cada teléfono.
+
+Comandos (también `ayuda`):
+
+| Mensaje | Acción |
+|---------|--------|
+| `listar` | Lista tus personajes |
+| `ver 12` | Detalle |
+| `crear Luke Skywalker \| 172 \| 77 \| blond \| fair \| blue` | Alta |
+| `actualizar 12 masa=80` | Cambio parcial |
+| `eliminar 12` | Baja |
+
+El alta y la actualización también aceptan varias líneas (`nombre:`, `altura:`, `masa:`, `pelo:`, `piel:`, `ojos:`).
+
+Los ids de mensaje se recuerdan en memoria del proceso. Con más de un worker de uvicorn, un reintento de Meta puede ejecutar el comando dos veces.
 
 ## Servidor MCP
 

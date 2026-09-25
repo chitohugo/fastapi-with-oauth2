@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Added
+- WhatsApp Cloud API webhook to list, create, update, and delete characters by chat
+- ngrok Compose profile to publish the API for that webhook
 - MCP server (stdio + optional Streamable HTTP profile) with character CRUD tools
 - Health endpoints `/health` and `/ready`
 - GitHub Actions CI (Docker + pytest)
