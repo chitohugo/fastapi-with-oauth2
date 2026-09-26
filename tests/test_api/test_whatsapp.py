@@ -6,7 +6,8 @@ import pytest
 from dependency_injector import providers
 
 from config import settings
-from core.services.whatsapp_service import WhatsAppService, clear_seen_messages
+from core.messaging.service import MessagingService, clear_seen_messages
+from core.services.whatsapp_provider import WhatsAppProvider
 from main import AppCreator
 
 
@@ -15,7 +16,7 @@ class RecordingClient:
         self.sent = []
 
     async def send_text(self, to: str, body: str) -> None:
-        self.sent.append({"to": to, "body": body})
+        self.sent.append({"to": to, "body": body, "kind": "text"})
 
 
 @pytest.fixture
@@ -66,6 +67,16 @@ def _text_payload(phone: str, text: str, message_id: str) -> dict:
             }
         ],
     }
+
+
+def test_help_is_plain_text(req, whatsapp_out):
+    linked = req.put("/api/v1/whatsapp/me", json={"phone": "5491155550103"})
+    assert linked.status_code == 200
+    response = _post_webhook(req, _text_payload("5491155550103", "hola", "wamid.menu"))
+    assert response.status_code == 200
+    sent = whatsapp_out.sent[-1]
+    assert sent["kind"] == "text"
+    assert "listar" in sent["body"]
 
 
 def test_verify_webhook(client):
@@ -135,6 +146,8 @@ def test_character_chat_flow(req, whatsapp_out):
     )
     assert created.status_code == 200
     assert "Personaje creado" in whatsapp_out.sent[-1]["body"]
+    assert whatsapp_out.sent[-1]["kind"] == "text"
+    assert "*Luke Skywalker*" in whatsapp_out.sent[-1]["body"]
 
     listed = req.get("/api/v1/characters")
     assert listed.status_code == 200
@@ -146,7 +159,17 @@ def test_character_chat_flow(req, whatsapp_out):
         _text_payload("5491155550102", f"ver {character['id']}", "wamid.get"),
     )
     assert detailed.status_code == 200
-    assert "Luke Skywalker" in whatsapp_out.sent[-1]["body"]
+    assert "*Luke Skywalker*" in whatsapp_out.sent[-1]["body"]
+    assert whatsapp_out.sent[-1]["kind"] == "text"
+
+    listed_chat = _post_webhook(
+        req,
+        _text_payload("5491155550102", "listar", "wamid.list"),
+    )
+    assert listed_chat.status_code == 200
+    assert whatsapp_out.sent[-1]["kind"] == "text"
+    assert "*Luke Skywalker*" in whatsapp_out.sent[-1]["body"]
+    assert f"#{character['id']}" in whatsapp_out.sent[-1]["body"]
 
     updated = _post_webhook(
         req,
@@ -264,11 +287,15 @@ async def test_default_user_when_phone_is_not_linked():
     characters = AsyncMock()
     characters.get_list_for_user.return_value = []
     contacts = AsyncMock()
-    contacts.find_by_phone.return_value = None
+    contacts.find_by_external_id.return_value = None
     sender = AsyncMock()
-    service = WhatsAppService(characters, contacts, sender, default_user_id=4)
+    service = MessagingService(characters, contacts)
     clear_seen_messages()
-    await service.handle_payload(_text_payload("5491100001111", "listar", "wamid.default"))
+    await service.handle(
+        WhatsAppProvider(sender),
+        _text_payload("5491100001111", "listar", "wamid.default"),
+        default_user_id=4,
+    )
     characters.get_list_for_user.assert_awaited_once_with(4)
     sender.send_text.assert_awaited()
     clear_seen_messages()

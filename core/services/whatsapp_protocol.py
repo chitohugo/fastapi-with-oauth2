@@ -2,18 +2,9 @@
 
 import hashlib
 import hmac
-from dataclasses import dataclass
 from typing import Optional
 
-
-@dataclass
-class InboundMessage:
-    """One inbound WhatsApp message extracted from a webhook payload."""
-
-    message_id: str
-    phone: str
-    text: Optional[str]
-    message_type: str
+from core.messaging.messages import InboundMessage
 
 
 def normalize_phone(value: str) -> str:
@@ -55,6 +46,32 @@ def verify_subscription(mode: str, token: str, expected_token: str) -> bool:
     return hmac.compare_digest(token.encode("utf-8"), expected_token.encode("utf-8"))
 
 
+def _inbound_text(raw: dict, message_type: str) -> Optional[str]:
+    """Text command from a text message or from a tapped button or list row."""
+    if message_type == "text":
+        body = str((raw.get("text") or {}).get("body") or "").strip()
+        return body or None
+    if message_type != "interactive":
+        return None
+    interactive = raw.get("interactive") or {}
+    kind = str(interactive.get("type") or "")
+    choice = interactive.get(kind) or {}
+    if not isinstance(choice, dict):
+        return None
+    return command_from_choice(str(choice.get("id") or ""))
+
+
+def command_from_choice(choice_id: str) -> Optional[str]:
+    """Map a button or list id back to a chat command."""
+    known = {"listar", "ayuda", "menu:crear", "menu:actualizar", "menu:eliminar"}
+    if choice_id in known:
+        return choice_id
+    prefix, _, value = choice_id.partition(":")
+    if prefix in {"ver", "eliminar"} and value.isdigit():
+        return f"{prefix} {value}"
+    return None
+
+
 def parse_inbound_messages(payload: dict) -> list[InboundMessage]:
     """Extract inbound messages. Status callbacks yield an empty list."""
     messages: list[InboundMessage] = []
@@ -62,17 +79,15 @@ def parse_inbound_messages(payload: dict) -> list[InboundMessage]:
         for change in entry.get("changes") or []:
             value = change.get("value") or {}
             for raw in value.get("messages") or []:
-                phone = normalize_phone(str(raw.get("from") or ""))
-                if not phone:
+                external_id = normalize_phone(str(raw.get("from") or ""))
+                if not external_id:
                     continue
                 message_type = str(raw.get("type") or "unknown")
-                text = None
-                if message_type == "text":
-                    text = str((raw.get("text") or {}).get("body") or "").strip()
+                text = _inbound_text(raw, message_type)
                 messages.append(
                     InboundMessage(
                         message_id=str(raw.get("id") or ""),
-                        phone=phone,
+                        external_id=external_id,
                         text=text,
                         message_type=message_type,
                     )

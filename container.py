@@ -1,17 +1,37 @@
+from typing import Optional
+
+from dependency_injector import containers, providers
 from httpx import AsyncClient
 
+from app.messaging.llm_agent import LlmCharacterAgent
 from config import get_settings, settings
+from core.messaging.service import MessagingService
+from core.repository.character_repository import CharacterRepository
+from core.repository.messaging_contact_repository import MessagingContactRepository
 from core.repository.user_repository import UserRepository
-from core.repository.whatsapp_contact_repository import WhatsAppContactRepository
 from core.services.auth_service import AuthService
 from core.services.character_service import CharacterService
 from core.services.oauth_service import GoogleOAuthService, GitHubOAuthService
 from core.services.user_service import UserService
 from core.services.whatsapp_client import WhatsAppClient
-from core.services.whatsapp_service import WhatsAppService
-from core.repository.character_repository import CharacterRepository
-from dependency_injector import containers, providers
+from core.services.whatsapp_provider import WhatsAppProvider
 from db.database import Database
+
+
+def build_llm_agent(
+    character_service: CharacterService,
+    http_client: AsyncClient,
+) -> Optional[LlmCharacterAgent]:
+    """Return the natural-language agent when an API key is configured."""
+    if not settings.llm_api_key:
+        return None
+    return LlmCharacterAgent(
+        character_service=character_service,
+        http_client=http_client,
+        api_key=settings.llm_api_key,
+        model=settings.llm_model,
+        base_url=settings.llm_base_url,
+    )
 
 
 class Container(containers.DeclarativeContainer):
@@ -28,8 +48,14 @@ class Container(containers.DeclarativeContainer):
     )
     db = providers.Singleton(Database, db_url=get_settings().database_url)
 
-    user_repository = providers.Factory(UserRepository, session_factory=db.provided.session)
-    character_repository = providers.Factory(CharacterRepository, session_factory=db.provided.session)
+    user_repository = providers.Factory(
+        UserRepository,
+        session_factory=db.provided.session,
+    )
+    character_repository = providers.Factory(
+        CharacterRepository,
+        session_factory=db.provided.session,
+    )
 
     auth_service = providers.Factory(AuthService, user_repository=user_repository)
     user_service = providers.Factory(UserService, user_repository=user_repository)
@@ -63,8 +89,8 @@ class Container(containers.DeclarativeContainer):
         user_info_url=config.github_user_info_url
     )
 
-    whatsapp_contact_repository = providers.Factory(
-        WhatsAppContactRepository,
+    messaging_contact_repository = providers.Factory(
+        MessagingContactRepository,
         session_factory=db.provided.session,
     )
 
@@ -77,10 +103,17 @@ class Container(containers.DeclarativeContainer):
         http_client=http_client,
     )
 
-    whatsapp_service = providers.Factory(
-        WhatsAppService,
+    whatsapp_provider = providers.Factory(WhatsAppProvider, client=whatsapp_client)
+
+    llm_agent = providers.Singleton(
+        build_llm_agent,
         character_service=character_service,
-        contact_repository=whatsapp_contact_repository,
-        client=whatsapp_client,
-        default_user_id=settings.whatsapp_default_user_id,
+        http_client=http_client,
+    )
+
+    messaging_service = providers.Factory(
+        MessagingService,
+        character_service=character_service,
+        contact_repository=messaging_contact_repository,
+        agent=llm_agent,
     )

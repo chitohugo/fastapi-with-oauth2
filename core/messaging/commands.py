@@ -1,4 +1,4 @@
-"""Parse WhatsApp text into character commands."""
+"""Parse chat text into character commands. The channel does not matter."""
 
 from dataclasses import dataclass
 from typing import Optional, Union
@@ -26,12 +26,6 @@ actualizar 12
 masa: 80
 ojos: green
 """
-
-UNLINKED_TEXT = (
-    "Este número ({phone}) no está vinculado a un usuario.\n"
-    "Con tu JWT, llamá a PUT /api/v1/whatsapp/me con "
-    '{{"phone": "{phone}"}} y volvé a escribir.'
-)
 
 _VERBS = {
     "ayuda": "help",
@@ -94,7 +88,7 @@ class ParsedCommand:
 
 
 def parse_command(text: str) -> ParsedCommand:
-    """Parse a WhatsApp text body into a character command."""
+    """Parse a chat message into a character command."""
     lines = [line.strip() for line in text.strip().splitlines() if line.strip()]
     if not lines:
         raise CommandError("Escribí ayuda para ver los comandos.")
@@ -118,15 +112,6 @@ def parse_command(text: str) -> ParsedCommand:
     if verb == "create":
         return ParsedCommand(kind="create", payload=_parse_create(rest, extra))
     return ParsedCommand(kind="update", **_parse_update(rest, extra))
-
-
-def format_character(character) -> str:
-    """Render one character for a WhatsApp reply."""
-    return (
-        f"#{character.id} {character.name}\n"
-        f"altura {character.height:g} | masa {character.mass:g} | "
-        f"pelo {character.hair_color} | piel {character.skin_color} | ojos {character.eye_color}"
-    )
 
 
 def _parse_create(rest: str, extra: list[str]) -> PostCharacter:

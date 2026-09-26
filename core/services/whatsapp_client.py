@@ -30,37 +30,50 @@ class WhatsAppClient:
 
     async def send_text(self, to: str, body: str) -> None:
         """Deliver a text message. Missing credentials are logged and skipped."""
+        await self._deliver(
+            to,
+            {"type": "text", "text": {"preview_url": False, "body": _clip(body, _MAX_BODY)}},
+        )
+
+    async def _deliver(self, to: str, message: dict) -> bool:
+        """POST one Cloud API message. Return whether Meta accepted it."""
         to = outbound_phone(to)
-        text = body if len(body) <= _MAX_BODY else body[: _MAX_BODY - 1] + "…"
         if not self.access_token or not self.phone_number_id:
-            logger.warning(
-                "WhatsApp API is not configured. Reply to %s was not sent: %s",
-                to,
-                text,
-            )
-            return
+            logger.warning("WhatsApp API is not configured. Reply to %s was not sent.", to)
+            return True
 
         url = f"{self.graph_url}/{self.api_version}/{self.phone_number_id}/messages"
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to,
+            **message,
+        }
         try:
             response = await self.http_client.post(
                 url,
                 headers={"Authorization": f"Bearer {self.access_token}"},
-                json={
-                    "messaging_product": "whatsapp",
-                    "recipient_type": "individual",
-                    "to": to,
-                    "type": "text",
-                    "text": {"preview_url": False, "body": text},
-                },
+                json=payload,
                 timeout=15.0,
             )
-            if response.is_error:
-                logger.error(
-                    "WhatsApp send failed for %s: %s %s",
-                    to,
-                    response.status_code,
-                    response.text,
-                )
-                return
         except Exception:
             logger.exception("WhatsApp send failed for %s", to)
+            return False
+        if response.is_error:
+            logger.error(
+                "WhatsApp send failed for %s: %s %s",
+                to,
+                response.status_code,
+                response.text,
+            )
+            return False
+        return True
+
+
+def _clip(value: str, limit: int) -> str:
+    """Keep ``value`` inside Meta's length limit."""
+    if len(value) <= limit:
+        return value
+    if limit <= 1:
+        return value[:limit]
+    return value[: limit - 1] + "…"

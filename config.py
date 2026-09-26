@@ -85,6 +85,12 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("WHATSAPP_DEFAULT_USER_ID"),
     )
+    llm_api_key: str = Field(default="", validation_alias=AliasChoices("LLM_API_KEY"))
+    llm_base_url: str = Field(
+        default="https://api.openai.com/v1",
+        validation_alias=AliasChoices("LLM_BASE_URL"),
+    )
+    llm_model: str = Field(default="gpt-4o-mini", validation_alias=AliasChoices("LLM_MODEL"))
 
     @property
     def database_url(self) -> str:
@@ -143,6 +149,9 @@ class TestSettings(Settings):
     whatsapp_access_token: str = ""
     whatsapp_phone_number_id: str = ""
     whatsapp_default_user_id: Optional[int] = None
+    llm_api_key: str = ""
+    llm_base_url: str = "https://api.openai.com/v1"
+    llm_model: str = "gpt-4o-mini"
 
     @property
     def database_url(self) -> str:

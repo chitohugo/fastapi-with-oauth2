@@ -3,8 +3,9 @@ import hmac
 
 import pytest
 
-from core.services.whatsapp_commands import CommandError, parse_command
+from core.messaging.commands import CommandError, parse_command
 from core.services.whatsapp_protocol import (
+    command_from_choice,
     outbound_phone,
     parse_inbound_messages,
     signature_is_valid,
@@ -71,6 +72,14 @@ def test_signature_and_subscription():
     assert verify_subscription("unsubscribe", "token", "token") is False
 
 
+def test_choice_ids_become_commands():
+    assert command_from_choice("listar") == "listar"
+    assert command_from_choice("ver:12") == "ver 12"
+    assert command_from_choice("eliminar:3") == "eliminar 3"
+    assert command_from_choice("menu:crear") == "menu:crear"
+    assert command_from_choice("ver:abc") is None
+
+
 def test_parse_inbound_ignores_statuses_and_keeps_text():
     payload = {
         "entry": [
@@ -95,7 +104,7 @@ def test_parse_inbound_ignores_statuses_and_keeps_text():
         ]
     }
     messages = parse_inbound_messages(payload)
-    assert [(item.phone, item.text, item.message_type) for item in messages] == [
+    assert [(item.external_id, item.text, item.message_type) for item in messages] == [
         ("5491155550101", "listar", "text"),
         ("5491100000000", None, "image"),
     ]

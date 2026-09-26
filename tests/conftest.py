@@ -2,6 +2,12 @@ import asyncio
 import os
 
 os.environ["ENV"] = "test"
+os.environ["WHATSAPP_VERIFY_TOKEN"] = "test-verify-token"
+os.environ["WHATSAPP_APP_SECRET"] = "test-app-secret"
+os.environ["WHATSAPP_ACCESS_TOKEN"] = ""
+os.environ["WHATSAPP_PHONE_NUMBER_ID"] = ""
+os.environ["WHATSAPP_DEFAULT_USER_ID"] = ""
+os.environ["LLM_API_KEY"] = ""
 
 import pytest
 import pytest_asyncio

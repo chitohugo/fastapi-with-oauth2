@@ -127,6 +127,8 @@ make test
 | `WHATSAPP_ACCESS_TOKEN` | Token para enviar respuestas por la Cloud API |
 | `WHATSAPP_PHONE_NUMBER_ID` | ID del número de WhatsApp Business |
 | `WHATSAPP_DEFAULT_USER_ID` | Usuario único si el teléfono no está vinculado (opcional) |
+| `LLM_API_KEY` | Clave para entender frases en WhatsApp (API compatible con OpenAI) |
+| `LLM_MODEL` | Modelo de esa API (por defecto `gpt-4o-mini`) |
 | `NGROK_AUTHTOKEN` | Token del agente ngrok (perfil `ngrok`) |
 | `NGROK_URL` | URL reservada del túnel, por ejemplo `https://my-app.ngrok.app` (opcional) |
 
@@ -183,7 +185,7 @@ Variables útiles: `UVICORN_WORKERS`, `UVICORN_RELOAD=false` (ya fijado en el se
 
 ## WhatsApp
 
-El webhook de la [WhatsApp Cloud API](https://developers.facebook.com/docs/whatsapp/cloud-api/guides/set-up-webhooks) habla con el mismo `CharacterService` que la API REST.
+El webhook de la [WhatsApp Cloud API](https://developers.facebook.com/docs/whatsapp/cloud-api/guides/set-up-webhooks) es un proveedor de `MessagingService`. Los comandos y los vínculos con usuarios viven en `core/messaging` y en la tabla `messaging_contacts` (`provider` + `external_id`). Otro canal, por ejemplo Telegram, implementa el mismo contrato (`parse_inbound`, `send`, `normalize_external_id`) y llama al mismo `CharacterService`.
 
 1. En local, el túnel publica la API. Poné `NGROK_AUTHTOKEN` en `.env` y levantá el perfil:
 
@@ -218,6 +220,10 @@ Comandos (también `ayuda`):
 | `eliminar 12` | Baja |
 
 El alta y la actualización también aceptan varias líneas (`nombre:`, `altura:`, `masa:`, `pelo:`, `piel:`, `ojos:`).
+
+Con `LLM_API_KEY` el chat entiende frases ("creá un personaje", "eliminá este") y ejecuta las mismas tools que el MCP (`list_characters`, `create_character`, `update_character`, `delete_character`, `get_character`). Sin esa clave siguen los comandos de la tabla.
+
+Las respuestas son texto. La ficha de un personaje usa negrita de WhatsApp.
 
 Los ids de mensaje se recuerdan en memoria del proceso. Con más de un worker de uvicorn, un reintento de Meta puede ejecutar el comando dos veces.
 

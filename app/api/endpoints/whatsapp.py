@@ -10,10 +10,11 @@ from container import Container
 from core.dependencies import get_current_user
 from core.models.user import User
 from core.schema.base_schema import Blank
+from core.messaging.service import MessagingService
 from core.schema.whatsapp_schema import LinkWhatsApp, WhatsAppLink
 from core.security import JWTBearer
 from core.services.whatsapp_protocol import signature_is_valid, verify_subscription
-from core.services.whatsapp_service import WhatsAppService
+from core.services.whatsapp_provider import WhatsAppProvider
 
 logger = logging.getLogger("client-ai")
 
@@ -41,7 +42,8 @@ async def verify_whatsapp_webhook(
 @inject
 async def receive_whatsapp_webhook(
     request: Request,
-    service: WhatsAppService = Depends(Provide[Container.whatsapp_service]),
+    service: MessagingService = Depends(Provide[Container.messaging_service]),
+    provider: WhatsAppProvider = Depends(Provide[Container.whatsapp_provider]),
 ):
     """Receive WhatsApp messages and reply with character commands."""
     body = await request.body()
@@ -55,7 +57,7 @@ async def receive_whatsapp_webhook(
         return JSONResponse(status_code=400, content={"message": "Invalid JSON"})
     if not isinstance(payload, dict):
         return JSONResponse(status_code=400, content={"message": "Invalid JSON"})
-    await service.handle_payload(payload)
+    await service.handle(provider, payload, default_user_id=settings.whatsapp_default_user_id)
     return {"status": "ok"}
 
 
@@ -64,28 +66,33 @@ async def receive_whatsapp_webhook(
 async def link_whatsapp(
     payload: LinkWhatsApp,
     current_user: User = Depends(get_current_user),
-    service: WhatsAppService = Depends(Provide[Container.whatsapp_service]),
+    service: MessagingService = Depends(Provide[Container.messaging_service]),
+    provider: WhatsAppProvider = Depends(Provide[Container.whatsapp_provider]),
 ):
     """Bind the authenticated user to a WhatsApp phone number."""
-    return await service.link_current_user(current_user.id, payload.phone)
+    contact = await service.link(provider, current_user.id, payload.phone)
+    return WhatsAppLink(phone=contact.external_id, user_id=contact.user_id)
 
 
 @link_router.get("/me", response_model=WhatsAppLink)
 @inject
 async def get_whatsapp_link(
     current_user: User = Depends(get_current_user),
-    service: WhatsAppService = Depends(Provide[Container.whatsapp_service]),
+    service: MessagingService = Depends(Provide[Container.messaging_service]),
+    provider: WhatsAppProvider = Depends(Provide[Container.whatsapp_provider]),
 ):
     """Return the WhatsApp number linked to the authenticated user."""
-    return await service.get_link(current_user.id)
+    contact = await service.get_link(provider, current_user.id)
+    return WhatsAppLink(phone=contact.external_id, user_id=contact.user_id)
 
 
 @link_router.delete("/me", response_model=Blank)
 @inject
 async def unlink_whatsapp(
     current_user: User = Depends(get_current_user),
-    service: WhatsAppService = Depends(Provide[Container.whatsapp_service]),
+    service: MessagingService = Depends(Provide[Container.messaging_service]),
+    provider: WhatsAppProvider = Depends(Provide[Container.whatsapp_provider]),
 ):
     """Remove the WhatsApp number linked to the authenticated user."""
-    await service.unlink(current_user.id)
+    await service.unlink(provider, current_user.id)
     return Blank()

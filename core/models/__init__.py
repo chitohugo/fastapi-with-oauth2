@@ -1,5 +1,5 @@
 from .character import Character
+from .messaging_contact import MessagingContact
 from .user import User
-from .whatsapp_contact import WhatsAppContact
 
-__all__ = ["Character", "User", "WhatsAppContact"]
+__all__ = ["Character", "MessagingContact", "User"]

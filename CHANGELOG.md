@@ -4,6 +4,9 @@
 
 ### Added
 - WhatsApp Cloud API webhook to list, create, update, and delete characters by chat
+- Messaging provider boundary so a channel (WhatsApp today) is an adapter over shared commands and contacts
+- WhatsApp replies use bold text for character cards
+- WhatsApp natural language calls the same character tools as the MCP server when `LLM_API_KEY` is set
 - ngrok Compose profile to publish the API for that webhook
 - MCP server (stdio + optional Streamable HTTP profile) with character CRUD tools
 - Health endpoints `/health` and `/ready`
@@ -25,4 +28,4 @@
 ### Fixed
 - Duplicate email on signup returns 409
 - MCP/Cursor path and Docker-based launch scripts
-- Dependency conflicts (uvicorn vs mcp)
+- Dependency conflicts (uvicorn vs mcp; pydantic vs mcp-types)
